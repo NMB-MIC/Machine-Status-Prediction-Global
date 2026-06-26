@@ -1,0 +1,7 @@
+place the 4 artifacts files in this folder. Required files inside `service/models/`:
+
+  * `artifacts_phase4.pkl`
+  * `lgbm_quantile_p50_final.pkl`
+  * `lgbm_quantile_p90_final.pkl`
+  * `lgbm_next_type.pkl`
+

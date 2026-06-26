@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-eta-service
+  namespace: ml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-eta-service
+  template:
+    metadata:
+      labels:
+        app: alert-eta-service
+    spec:
+      containers:
+        - name: api
+          image: alert-eta-service:global-pandas233-gd
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MODEL_DIR
+              value: "/models"
+            - name: SERVICE_VERSION
+              value: "phase5_global_v1"
+            - name: TYPE_CONF_THRESHOLD
+              value: "0.6"
+            - name: MIN_MARGIN_SECS
+              value: "5.0"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-eta-service
+  namespace: ml
+spec:
+  type: NodePort
+  selector:
+    app: alert-eta-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080

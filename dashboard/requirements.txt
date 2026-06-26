@@ -1,0 +1,4 @@
+streamlit==1.31.0
+pandas==2.2.2
+kafka-python==2.0.2
+altair==5.2.0

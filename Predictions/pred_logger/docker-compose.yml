@@ -1,0 +1,17 @@
+services:
+  pred_logger:
+    image: mic/pred_logger:global-flush
+    container_name: pred_logger
+    network_mode: host
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      - KAFKA_BOOTSTRAP=localhost:9092
+      - KAFKA_TOPIC=ml.pred.alert.eta
+      - KAFKA_GROUP_ID=pred-logger
+      - AUTO_OFFSET_RESET=latest
+      - OUTPUT_DIR=/data/predictions
+      - FLUSH_EVERY=1000
+      - FLUSH_SECS=60
+      - TZ=Asia/Bangkok
+    volumes:
+      - /home/micml/Documents/TestML/predictions:/data/predictions

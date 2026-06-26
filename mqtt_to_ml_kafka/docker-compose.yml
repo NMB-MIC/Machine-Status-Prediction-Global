@@ -1,0 +1,12 @@
+version: '3'
+services:
+  mqtt_to_ml_kafka:
+    image: mic/mqtt_ml_kafka:1.0.0
+    container_name: mqtt_to_ml_kafka
+    network_mode: host
+    environment:
+      - TZ=Asia/Bangkok
+    volumes:
+      - ./.env:/app/.env
+      - ./log:/app/log
+    restart: always

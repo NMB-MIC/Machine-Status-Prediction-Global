@@ -1,0 +1,112 @@
+# Predictions/pred_logger/pred_logger.py — Global prediction logger
+
+import os
+import json
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pandas as pd
+from kafka import KafkaConsumer
+
+BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "localhost:9092")
+TOPIC = os.environ.get("KAFKA_TOPIC", "ml.pred.alert.eta")
+GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "pred-logger")
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/data/predictions")
+FLUSH_EVERY = int(os.environ.get("FLUSH_EVERY", "1000"))
+FLUSH_SECS = int(os.environ.get("FLUSH_SECS", "60"))
+
+Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+
+COLUMNS = [
+    "pred_id", "source_event_id", "plant", "process", "mc_no", "mc_status",
+    "eta_p50_sec", "eta_p90_sec", "eta_p50_ts", "eta_p90_ts",
+    "next_type", "type_conf", "model_version", "feature_version",
+    "now_ts", "logged_at"
+]
+
+
+def get_output_path() -> str:
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    return os.path.join(OUTPUT_DIR, f"predictions_{date_str}.parquet")
+
+
+def flush_buffer(buffer: list):
+    if not buffer:
+        return
+
+    df_new = pd.DataFrame(buffer, columns=COLUMNS)
+    path = get_output_path()
+
+    if os.path.exists(path):
+        df_existing = pd.read_parquet(path)
+        # Add any newly introduced columns safely.
+        for c in COLUMNS:
+            if c not in df_existing.columns:
+                df_existing[c] = None
+        df_combined = pd.concat([df_existing[COLUMNS], df_new[COLUMNS]], ignore_index=True)
+    else:
+        df_combined = df_new
+
+    df_combined.to_parquet(path, index=False)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Flushed {len(buffer)} rows → {path} (total: {len(df_combined)})")
+
+
+def main():
+    print(f"{'='*60}")
+    print("  GLOBAL PREDICTION LOGGER")
+    print(f"  Topic: {TOPIC}")
+    print(f"  Output: {OUTPUT_DIR}")
+    print(f"  Flush: every {FLUSH_EVERY} rows or {FLUSH_SECS}s")
+    print(f"{'='*60}\n")
+
+    consumer = KafkaConsumer(
+        TOPIC,
+        bootstrap_servers=BOOTSTRAP,
+        group_id=GROUP_ID,
+        auto_offset_reset="earliest",
+        enable_auto_commit=True,
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        consumer_timeout_ms=-1,
+    )
+
+    buffer = []
+    last_flush = time.time()
+    total = 0
+
+    try:
+        for msg in consumer:
+            p = msg.value
+            row = [
+                p.get("pred_id"),
+                p.get("source_event_id"),
+                p.get("plant"),
+                p.get("process"),
+                p.get("mc_no"),
+                p.get("mc_status"),
+                p.get("eta_p50_sec"),
+                p.get("eta_p90_sec"),
+                p.get("eta_p50_ts"),
+                p.get("eta_p90_ts"),
+                p.get("next_type"),
+                p.get("type_conf"),
+                p.get("model_version"),
+                p.get("feature_version"),
+                p.get("now_ts"),
+                datetime.now(timezone.utc).isoformat(),
+            ]
+            buffer.append(row)
+            total += 1
+
+            elapsed = time.time() - last_flush
+            if len(buffer) >= FLUSH_EVERY or elapsed >= FLUSH_SECS:
+                flush_buffer(buffer)
+                buffer = []
+                last_flush = time.time()
+    finally:
+        flush_buffer(buffer)
+        print(f"Logger stopped. Total logged: {total}")
+
+
+if __name__ == "__main__":
+    main()

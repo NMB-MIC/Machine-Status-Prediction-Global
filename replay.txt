@@ -1,0 +1,17 @@
+python replay.py \
+  --input /home/micml/Documents/TestML/AutoTrain/nht_assy/MCSTATUS_ASSY.csv \
+  --process-override assy \
+  --plant-override nhb \
+  --bootstrap localhost:9092 \
+  --topic iot.machine.status.raw \
+  --limit 10000 \
+  --sleep 0.0
+
+python replay.py \
+  --input /home/micml/Documents/TestML/AutoTrain/nht_gd/status_nht_converted.parquet \
+  --process-override gd \
+  --plant-override nht \
+  --bootstrap localhost:9092 \
+  --topic iot.machine.status.raw \
+  --limit 10000 \
+  --sleep 0.0
